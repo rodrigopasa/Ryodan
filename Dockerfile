@@ -1,25 +1,13 @@
-# Multi-stage build for production optimization
-FROM node:20-alpine AS builder
+# Dockerfile otimizado para produção
+FROM node:20-alpine AS base
 
-# Install build dependencies including Python and build tools
-RUN apk add --no-cache \
-    libc6-compat \
-    python3 \
-    py3-pip \
-    make \
-    g++ \
-    cairo-dev \
-    jpeg-dev \
-    pango-dev \
-    musl-dev \
-    giflib-dev \
-    pixman-dev \
-    pkgconfig \
-    libjpeg-turbo-dev
+# Instalar dependências básicas
+RUN apk add --no-cache curl
 
+# Definir diretório de trabalho
 WORKDIR /app
 
-# Copy package files
+# Copiar arquivos de configuração
 COPY package*.json ./
 COPY tsconfig.json ./
 COPY vite.config.ts ./
@@ -27,57 +15,38 @@ COPY tailwind.config.ts ./
 COPY postcss.config.js ./
 COPY drizzle.config.ts ./
 
-# Install dependencies with Python available
-ENV PYTHON=/usr/bin/python3
-RUN npm ci && npm cache clean --force
+# Instalar todas as dependências para build
+RUN npm ci --verbose
 
-# Copy source code
+# Copiar código fonte
 COPY . .
 
-# Build the application
+# Build da aplicação
 RUN npm run build
 
-# Install only production dependencies in a separate step
-RUN npm ci --only=production --ignore-scripts && npm cache clean --force
+# Instalar apenas dependências de produção
+RUN rm -rf node_modules
+RUN npm ci --only=production --ignore-scripts
 
-# Production stage
-FROM node:20-alpine AS runner
-
-# Install runtime dependencies
-RUN apk add --no-cache \
-    curl \
-    cairo \
-    jpeg \
-    pango \
-    musl \
-    giflib \
-    pixman \
-    libjpeg-turbo
-
-WORKDIR /app
-
-# Create non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-# Copy built application and production dependencies
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
-
-# Create necessary directories
+# Criar diretórios necessários
 RUN mkdir -p uploads/pdfs uploads/thumbnails uploads/avatars uploads/temp
-RUN chown -R nextjs:nodejs uploads
 
-# Switch to non-root user
+# Criar usuário não-root
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nextjs -u 1001
+
+# Definir permissões
+RUN chown -R nextjs:nodejs uploads dist
+
+# Mudar para usuário não-root
 USER nextjs
 
-# Expose port
+# Expor porta
 EXPOSE 5000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:5000/api/health || exit 1
+# Health check removido - causa problemas no Coolify
+# HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+#   CMD curl -f http://localhost:5000/api/health || exit 1
 
-# Start the application
+# Comando de inicialização
 CMD ["npm", "start"]
