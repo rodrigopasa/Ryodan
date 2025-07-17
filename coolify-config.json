@@ -19,7 +19,7 @@
   ],
   "build": {
     "buildpack": "dockerfile",
-    "dockerfile": "Dockerfile.simple-robust",
+    "dockerfile": "Dockerfile",
     "node_version": "20",
     "build_command": "npm ci && npm run build",
     "start_command": "npm start"
