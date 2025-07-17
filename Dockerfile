@@ -1,8 +1,21 @@
 # Multi-stage build for production optimization
 FROM node:20-alpine AS builder
 
-# Install build dependencies
-RUN apk add --no-cache libc6-compat
+# Install build dependencies including Python and build tools
+RUN apk add --no-cache \
+    libc6-compat \
+    python3 \
+    py3-pip \
+    make \
+    g++ \
+    cairo-dev \
+    jpeg-dev \
+    pango-dev \
+    musl-dev \
+    giflib-dev \
+    pixman-dev \
+    pkgconfig \
+    libjpeg-turbo-dev
 
 WORKDIR /app
 
@@ -14,7 +27,8 @@ COPY tailwind.config.ts ./
 COPY postcss.config.js ./
 COPY drizzle.config.ts ./
 
-# Install dependencies
+# Install dependencies with Python available
+ENV PYTHON=/usr/bin/python3
 RUN npm ci --only=production && npm cache clean --force
 
 # Copy source code
@@ -27,7 +41,15 @@ RUN npm run build
 FROM node:20-alpine AS runner
 
 # Install runtime dependencies
-RUN apk add --no-cache curl
+RUN apk add --no-cache \
+    curl \
+    cairo \
+    jpeg \
+    pango \
+    musl \
+    giflib \
+    pixman \
+    libjpeg-turbo
 
 WORKDIR /app
 
