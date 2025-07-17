@@ -1,6 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
 import { createAdminUser, createDefaultCategories } from "./migrate";
 
 const app = express();
@@ -16,7 +15,7 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      log(logLine);
+      console.log(`${new Date().toLocaleTimeString()} [express] ${logLine}`);
     }
   });
 
@@ -62,17 +61,25 @@ app.use('/api/*', (req, res, next) => {
 });
 
 // Setup vite for development or static serving for production
-if (process.env.NODE_ENV === "production") {
-  serveStatic(app);
-} else {
-  await setupVite(app);
-}
-
-// Start server
 const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, "0.0.0.0", () => {
-  log(`Server running on port ${PORT}`);
-});
+let server;
+
+if (process.env.NODE_ENV === "production") {
+  // Production mode - serve static files
+  const { serveStatic, log } = await import("./static");
+  serveStatic(app);
+  
+  server = app.listen(PORT, "0.0.0.0", () => {
+    log(`Server running on port ${PORT}`);
+  });
+} else {
+  // Development mode - use vite
+  const { setupVite, log } = await import("./vite");
+  server = app.listen(PORT, "0.0.0.0", async () => {
+    await setupVite(app, server);
+    log(`Server running on port ${PORT}`);
+  });
+}
 
 // Handle graceful shutdown
 process.on('SIGTERM', () => {
